@@ -1,0 +1,25 @@
+name: Feature request
+description: 提议新功能或改进
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用场景
+      description: 这个功能解决什么实际问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+    validations:
+      required: true
+  - type: dropdown
+    id: writes
+    attributes:
+      label: 是否涉及商户写操作
+      options: [不涉及, 可能涉及, 明确涉及]
+    validations:
+      required: true
