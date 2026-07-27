@@ -4,6 +4,7 @@ import path from "node:path";
 import { AuthService } from "./auth-service";
 import { CatalogService } from "./catalog-service";
 import { LocalDataStore } from "./local-data-store";
+import { PublicCatalogService } from "./public-catalog-service";
 import { registerIpc } from "./ipc";
 import { createMainWindowOptions } from "./window-options";
 
@@ -31,7 +32,8 @@ app.whenReady().then(async () => {
   await auth.initialize();
   const localData = new LocalDataStore(path.join(app.getPath("userData"), "local-library-v1.json"));
   const catalog = new CatalogService(auth, localData);
-  registerIpc(auth, catalog, localData, () => mainWindow);
+  const publicCatalog = new PublicCatalogService(localData);
+  registerIpc(auth, catalog, publicCatalog, localData, () => mainWindow);
   await createWindow();
 
   app.on("activate", () => {

@@ -1,6 +1,6 @@
 {
   "name": "ldxp-source-browser-desktop",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "链动小铺货源查询与商品关联 Windows 客户端",
   "author": "cyy",
   "license": "UNLICENSED",
@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm test && npm run build",
     "start": "npm run build && electron .",
-    "dist": "npm run build && electron-builder --win nsis portable --x64"
+    "dist": "npm run build && electron-builder --win nsis portable --x64 --publish never"
   },
   "engines": {
     "node": ">=22.12.0"

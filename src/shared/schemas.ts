@@ -5,7 +5,8 @@ export const searchRequestSchema = z.object({
   goodsType: z.string().trim().max(40).default(""),
   pages: z.number().int().min(1).max(100),
   remotePageSize: z.union([z.literal(20), z.literal(50), z.literal(100)]),
-  speedMode: z.enum(["stable", "standard", "fast"])
+  speedMode: z.enum(["stable", "standard", "fast"]),
+  searchScope: z.enum(["source", "public", "all"]).default("source")
 }).strict();
 
 export const jobIdSchema = z.string().uuid();
@@ -67,6 +68,8 @@ export const productRecordSchema = z.object({
     verify: z.union([z.string(), z.number()]).nullable(),
     hasChild: z.boolean()
   }).strict(),
+  dataSource: z.enum(["source-square", "public-shop"]).optional(),
+  publicShopToken: z.string().max(100).optional(),
   change: z.object({
     salePriceDelta: nullableNumber,
     costPriceDelta: nullableNumber,
@@ -110,3 +113,13 @@ export const searchPresetInputSchema = z.object({
 
 export const presetIdSchema = z.string().uuid();
 export const exportProductsSchema = z.array(productRecordSchema).max(20_000);
+export const publicSourceUrlSchema = z.string().trim().url().max(4000).refine((value) => {
+  const url = new URL(value);
+  if (url.protocol !== "https:" || (url.hostname !== "pay.ldxp.cn" && url.hostname !== "www.ldxp.cn")) return false;
+  return /^\/(?:item|shop)\/[A-Za-z0-9_-]+\/?$/.test(url.pathname);
+}, "请输入链动小铺商品或店铺 HTTPS 链接");
+export const publicShopTokenSchema = z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/, "店铺标识不正确");
+export const publicCatalogSearchSchema = z.object({
+  keywords: z.string().trim().max(100),
+  goodsType: z.string().trim().max(40)
+}).strict();

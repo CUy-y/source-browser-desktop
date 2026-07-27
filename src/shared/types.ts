@@ -3,6 +3,8 @@ export type ProductStatusFilter = "all" | "normal" | "abnormal";
 export type RelationStateFilter = "all" | "connected" | "unconnected";
 export type SortMode = "default" | "sale-asc" | "sale-desc";
 export type SearchSpeedMode = "stable" | "standard" | "fast";
+export type SearchScope = "source" | "public" | "all";
+export type ProductDataSource = "source-square" | "public-shop";
 
 export interface SearchRequest {
   keywords: string;
@@ -10,6 +12,7 @@ export interface SearchRequest {
   pages: number;
   remotePageSize: 20 | 50 | 100;
   speedMode: SearchSpeedMode;
+  searchScope?: SearchScope;
 }
 
 export interface LocalFilters {
@@ -58,6 +61,8 @@ export interface ProductRecord {
     verify: string | number | null;
     hasChild: boolean;
   };
+  dataSource?: ProductDataSource;
+  publicShopToken?: string;
 }
 
 export interface ProductChangeSummary {
@@ -172,6 +177,34 @@ export interface LocalLibraryState {
   presets: SearchPreset[];
   monitorEvents: MonitorEvent[];
   priceHistory: Record<string, FavoritePricePoint[]>;
+  publicShops: PublicShopSummary[];
+}
+
+export interface PublicShopSummary {
+  token: string;
+  name: string;
+  url: string;
+  goodsCount: number;
+  createdAt: number;
+  updatedAt: number;
+  lastError: string;
+}
+
+export interface PublicShopSnapshot extends PublicShopSummary {
+  products: ProductRecord[];
+}
+
+export interface PublicCatalogSearchRequest {
+  keywords: string;
+  goodsType: string;
+}
+
+export interface PublicCatalogMutationResult {
+  state: LocalLibraryState;
+  shop?: PublicShopSummary;
+  imported?: number;
+  failed?: number;
+  message: string;
 }
 
 export type SearchJobStatus = "running" | "done" | "failed" | "cancelled";
@@ -232,6 +265,15 @@ export interface SourceBrowserApi {
     removeFavorite(identity: string): Promise<LocalLibraryState>;
     savePreset(input: SearchPresetInput): Promise<LocalLibraryState>;
     deletePreset(id: string): Promise<LocalLibraryState>;
+  };
+  publicCatalog: {
+    search(request: PublicCatalogSearchRequest): Promise<ProductRecord[]>;
+    addSource(url: string): Promise<PublicCatalogMutationResult>;
+    refreshShop(token: string): Promise<PublicCatalogMutationResult>;
+    refreshAll(): Promise<PublicCatalogMutationResult>;
+    removeShop(token: string): Promise<PublicCatalogMutationResult>;
+    importShops(): Promise<PublicCatalogMutationResult>;
+    exportShops(): Promise<{ exported: boolean; filePath?: string }>;
   };
   system: {
     openExternal(url: string): Promise<{ opened: boolean }>;

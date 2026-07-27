@@ -11,6 +11,7 @@ import type {
   MonitorRunSummary,
   ProductChangeSummary,
   ProductRecord,
+  PublicShopSnapshot,
   SearchPreset,
   SearchPresetInput,
   SearchRequest
@@ -41,6 +42,7 @@ type PersistedState = {
   monitorEvents: MonitorEvent[];
   scopes: Record<string, Snapshot[]>;
   priceHistory: Record<string, FavoritePricePoint[]>;
+  publicShops: Record<string, PublicShopSnapshot>;
 };
 
 export type SnapshotResult = {
@@ -50,7 +52,7 @@ export type SnapshotResult = {
 
 const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
 export const PRICE_BUCKET_MS = 30 * 60 * 1000;
-const emptyState = (): PersistedState => ({ version: 1, favorites: {}, presets: [], monitorEvents: [], scopes: {}, priceHistory: {} });
+const emptyState = (): PersistedState => ({ version: 1, favorites: {}, presets: [], monitorEvents: [], scopes: {}, priceHistory: {}, publicShops: {} });
 const cleanProduct = (product: ProductRecord): ProductRecord => {
   const { change: _change, ...rest } = product;
   return rest;
@@ -88,7 +90,10 @@ export class LocalDataStore {
       monitorEvents: this.state.monitorEvents.slice(0, 500),
       priceHistory: Object.fromEntries(Object.entries(this.state.priceHistory)
         .map(([identity, points]) => [identity, points.filter((point) => point.recordedAt >= historyCutoff)] as const)
-        .filter(([, points]) => points.length > 0))
+        .filter(([, points]) => points.length > 0)),
+      publicShops: Object.values(this.state.publicShops)
+        .map(({ products, ...summary }) => ({ ...summary, goodsCount: products.length }))
+        .sort((left, right) => right.updatedAt - left.updatedAt)
     };
   }
 
@@ -135,6 +140,50 @@ export class LocalDataStore {
 
   deletePreset(id: string): LocalLibraryState {
     this.state.presets = this.state.presets.filter((preset) => preset.id !== id);
+    this.write();
+    return this.getState();
+  }
+
+  getPublicShopSnapshots(): PublicShopSnapshot[] {
+    return Object.values(this.state.publicShops).map((shop) => ({ ...shop, products: shop.products.map(cleanProduct) }));
+  }
+
+  upsertPublicShop(input: PublicShopSnapshot): LocalLibraryState {
+    const now = Date.now();
+    const previous = this.state.publicShops[input.token];
+    const seen = new Set<string>();
+    const products = input.products.flatMap((product, sourceIndex) => {
+      const normalized = cleanProduct({ ...product, dataSource: "public-shop", publicShopToken: input.token, sourceIndex });
+      const identity = productIdentity(normalized);
+      if (seen.has(identity)) return [];
+      seen.add(identity);
+      return [normalized];
+    });
+    this.state.publicShops[input.token] = {
+      ...input,
+      token: input.token,
+      url: input.url,
+      name: input.name || input.token,
+      goodsCount: products.length,
+      products,
+      createdAt: previous?.createdAt ?? input.createdAt ?? now,
+      updatedAt: input.updatedAt || now,
+      lastError: ""
+    };
+    this.updateFavoriteSamples(products, now);
+    this.write();
+    return this.getState();
+  }
+
+  markPublicShopError(token: string, message: string): LocalLibraryState {
+    const shop = this.state.publicShops[token];
+    if (shop) this.state.publicShops[token] = { ...shop, lastError: message.slice(0, 1000) };
+    this.write();
+    return this.getState();
+  }
+
+  removePublicShop(token: string): LocalLibraryState {
+    delete this.state.publicShops[token];
     this.write();
     return this.getState();
   }
@@ -197,29 +246,7 @@ export class LocalDataStore {
       }
     }
 
-    const historyCutoff = now - THREE_DAYS_MS;
-    for (const [identity, points] of Object.entries(this.state.priceHistory)) {
-      const retained = points.filter((point) => point.recordedAt >= historyCutoff);
-      if (retained.length) this.state.priceHistory[identity] = retained;
-      else delete this.state.priceHistory[identity];
-    }
-    {
-      const samples = new Map<string, ProductRecord>();
-      for (const product of [...products, ...favoriteSamples]) {
-        const identity = productIdentity(product);
-        if (this.state.favorites[identity] && product.stock !== null && product.stock > 0) samples.set(identity, product);
-      }
-      for (const [identity, product] of samples) {
-        const favorite = this.state.favorites[identity];
-        this.state.favorites[identity] = { ...favorite, product: cleanProduct(product), updatedAt: now };
-        this.state.priceHistory[identity] = mergePricePoint(this.state.priceHistory[identity] ?? [], {
-          recordedAt: now,
-          salePrice: product.salePrice,
-          costPrice: product.costPrice,
-          stock: product.stock
-        }).filter((point) => point.recordedAt >= historyCutoff).slice(-500);
-      }
-    }
+    this.updateFavoriteSamples([...products, ...favoriteSamples], now);
 
     const snapshot: Snapshot = { recordedAt: now, coverageComplete, products: currentProducts };
     const nextHistory = [snapshot, ...history];
@@ -270,10 +297,14 @@ export class LocalDataStore {
       return {
         version: 1,
         favorites: parsed.favorites && typeof parsed.favorites === "object" ? parsed.favorites : {},
-        presets: Array.isArray(parsed.presets) ? parsed.presets : [],
+        presets: Array.isArray(parsed.presets) ? parsed.presets.map((preset) => ({
+          ...preset,
+          search: { ...preset.search, searchScope: preset.search?.searchScope ?? "source" }
+        })) : [],
         monitorEvents: Array.isArray(parsed.monitorEvents) ? parsed.monitorEvents : [],
         scopes: parsed.scopes && typeof parsed.scopes === "object" ? parsed.scopes : {},
-        priceHistory: parsed.priceHistory && typeof parsed.priceHistory === "object" ? parsed.priceHistory : {}
+        priceHistory: parsed.priceHistory && typeof parsed.priceHistory === "object" ? parsed.priceHistory : {},
+        publicShops: parsed.publicShops && typeof parsed.publicShops === "object" ? parsed.publicShops : {}
       };
     } catch {
       return emptyState();
@@ -283,6 +314,30 @@ export class LocalDataStore {
   private write(): void {
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     fs.writeFileSync(this.filePath, JSON.stringify(this.state), { encoding: "utf8", mode: 0o600 });
+  }
+
+  private updateFavoriteSamples(products: ProductRecord[], now: number): void {
+    const historyCutoff = now - THREE_DAYS_MS;
+    for (const [identity, points] of Object.entries(this.state.priceHistory)) {
+      const retained = points.filter((point) => point.recordedAt >= historyCutoff);
+      if (retained.length) this.state.priceHistory[identity] = retained;
+      else delete this.state.priceHistory[identity];
+    }
+    const samples = new Map<string, ProductRecord>();
+    for (const product of products) {
+      const identity = productIdentity(product);
+      if (this.state.favorites[identity] && product.stock !== null && product.stock > 0) samples.set(identity, product);
+    }
+    for (const [identity, product] of samples) {
+      const favorite = this.state.favorites[identity];
+      this.state.favorites[identity] = { ...favorite, product: cleanProduct(product), updatedAt: now };
+      this.state.priceHistory[identity] = mergePricePoint(this.state.priceHistory[identity] ?? [], {
+        recordedAt: now,
+        salePrice: product.salePrice,
+        costPrice: product.costPrice,
+        stock: product.stock
+      }).filter((point) => point.recordedAt >= historyCutoff).slice(-500);
+    }
   }
 }
 

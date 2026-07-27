@@ -12,7 +12,7 @@ describe("productsToCsv", () => {
       change: { salePriceDelta: -2, costPriceDelta: null, previousStock: 1, stockDelta: 1, restocked: false, becameOutOfStock: false, statusChanged: false, relationChanged: false, messages: ["售价较上次降低 2 元"] }
     } satisfies ProductRecord;
     const csv = productsToCsv([product]);
-    expect(csv.startsWith("\uFEFF商品ID")).toBe(true);
+    expect(csv.startsWith("\uFEFF数据来源,商品ID")).toBe(true);
     expect(csv).toContain('"商品,""A"""');
     expect(csv).toContain("售价较上次降低 2 元");
   });

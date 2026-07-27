@@ -98,4 +98,42 @@ describe("LocalDataStore", () => {
     store.recordSuccessfulSnapshot(request, [product({ salePrice: 7, stock: 0 })], true);
     expect(store.getState().priceHistory["key:key-1"]).toHaveLength(1);
   });
+
+  it("persists public shops, removes duplicates, and refreshes favorite price history", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-26T08:00:00Z"));
+    const { store, filePath } = createStore();
+    const publicProduct = product({
+      id: "public-key-1",
+      costPrice: null,
+      agentPriceLimit: null,
+      relation: "unknown",
+      relationDetails: { price: null, addType: null, addRate: null, addPrice: null, nameSync: null, descriptionSync: null, link: "" },
+      dataSource: "public-shop",
+      publicShopToken: "shop-a"
+    });
+    store.upsertFavorite({ product: publicProduct, note: "公开商品", tags: [] });
+    store.upsertPublicShop({
+      token: "shop-a",
+      name: "甲店",
+      url: "https://pay.ldxp.cn/shop/shop-a",
+      goodsCount: 2,
+      products: [publicProduct, { ...publicProduct, id: "duplicate", salePrice: 9 }],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastError: ""
+    });
+
+    const reloaded = new LocalDataStore(filePath);
+    expect(reloaded.getState().publicShops).toEqual([
+      expect.objectContaining({ token: "shop-a", name: "甲店", goodsCount: 1, lastError: "" })
+    ]);
+    expect(reloaded.getPublicShopSnapshots()[0].products).toHaveLength(1);
+    expect(reloaded.getState().priceHistory["key:key-1"]).toEqual([
+      expect.objectContaining({ salePrice: 10, costPrice: null, stock: 5 })
+    ]);
+
+    expect(reloaded.removePublicShop("shop-a").publicShops).toHaveLength(0);
+    expect(new LocalDataStore(filePath).getState().publicShops).toHaveLength(0);
+  });
 });

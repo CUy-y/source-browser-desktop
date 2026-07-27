@@ -116,6 +116,7 @@ describe("filtering and sorting", () => {
   it("filters by relation state", () => {
     expect(applyFilters(rows, { ...filters, relationState: "connected" }).map((item) => item.id)).toEqual(["b"]);
     expect(applyFilters(rows, { ...filters, relationState: "unconnected" }).map((item) => item.id)).toEqual(["a", "c", "d"]);
+    expect(applyFilters([...rows, product({ id: "public", dataSource: "public-shop", relation: "unknown" })], { ...filters, relationState: "unconnected" }).map((item) => item.id)).not.toContain("public");
   });
 
   it("sorts by sale price stably and places missing prices last", () => {

@@ -101,7 +101,8 @@ export function normalizeProduct(rawValue: unknown, sourceIndex: number, baseUrl
       rawStatus: typeof rawStatus === "string" || typeof rawStatus === "number" ? rawStatus : null,
       verify: typeof verify === "string" || typeof verify === "number" ? verify : null,
       hasChild
-    }
+    },
+    dataSource: "source-square"
   };
 }
 
@@ -125,7 +126,7 @@ export function applyFilters(products: ProductRecord[], filters: LocalFilters): 
     if (filters.stockState === "in-stock" && !(product.stock !== null && product.stock > 0)) return false;
     if (filters.stockState === "out-of-stock" && product.stock !== 0) return false;
     if (filters.status !== "all" && product.status !== filters.status) return false;
-    if (filters.relationState !== "all" && product.relation !== filters.relationState) return false;
+    if (filters.relationState !== "all" && (product.dataSource === "public-shop" || product.relation !== filters.relationState)) return false;
     if (categoryNeedle && !product.categoryName.toLocaleLowerCase().includes(categoryNeedle)) return false;
     if (merchantNeedle && !product.merchantName.toLocaleLowerCase().includes(merchantNeedle)) return false;
     if (filters.minSalePrice !== null && (product.salePrice === null || product.salePrice < filters.minSalePrice)) return false;

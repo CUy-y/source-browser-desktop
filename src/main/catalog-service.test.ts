@@ -166,7 +166,7 @@ describe("CatalogService", () => {
 
     await vi.waitFor(() => expect(service.getProgress(jobId).status).toBe("done"));
     expect(service.getProgress(jobId).coverageComplete).toBe(false);
-    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith(request, expect.any(Array), false, [], 0);
+    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith({ ...request, searchScope: "source" }, expect.any(Array), false, [], 0);
     expect(localData.getFavorites).toHaveBeenCalledOnce();
   });
 
@@ -198,7 +198,7 @@ describe("CatalogService", () => {
     await vi.waitFor(() => expect(service.getProgress(jobId).status).toBe("done"));
     expect(service.getProgress(jobId).result?.map((product) => product.productKey)).toEqual(["main"]);
     expect(postJson).toHaveBeenCalledTimes(2);
-    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith(request, expect.any(Array), true, [expect.objectContaining({ productKey: "favorite", salePrice: 16 })], 0);
+    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith({ ...request, searchScope: "source" }, expect.any(Array), true, [expect.objectContaining({ productKey: "favorite", salePrice: 16 })], 0);
   });
 
   it("refreshes favorites after a successful partial query but keeps monitoring coverage false", async () => {
@@ -214,7 +214,7 @@ describe("CatalogService", () => {
 
     await vi.waitFor(() => expect(service.getProgress(jobId).status).toBe("done"));
     expect(service.getProgress(jobId).coverageComplete).toBe(false);
-    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith(request, expect.any(Array), false, [expect.objectContaining({ salePrice: 15 })], 0);
+    expect(recordSuccessfulSnapshot).toHaveBeenCalledWith({ ...request, searchScope: "source" }, expect.any(Array), false, [expect.objectContaining({ salePrice: 15 })], 0);
   });
 
   it("normalizes merchant categories without issuing a write", async () => {

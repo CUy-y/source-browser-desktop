@@ -23,6 +23,15 @@ const api: SourceBrowserApi = {
     savePreset: (input) => ipcRenderer.invoke("local:savePreset", input),
     deletePreset: (id) => ipcRenderer.invoke("local:deletePreset", id)
   },
+  publicCatalog: {
+    search: (request) => ipcRenderer.invoke("publicCatalog:search", request),
+    addSource: (url) => ipcRenderer.invoke("publicCatalog:addSource", url),
+    refreshShop: (token) => ipcRenderer.invoke("publicCatalog:refreshShop", token),
+    refreshAll: () => ipcRenderer.invoke("publicCatalog:refreshAll"),
+    removeShop: (token) => ipcRenderer.invoke("publicCatalog:removeShop", token),
+    importShops: () => ipcRenderer.invoke("publicCatalog:importShops"),
+    exportShops: () => ipcRenderer.invoke("publicCatalog:exportShops")
+  },
   system: {
     openExternal: (url) => ipcRenderer.invoke("system:openExternal", url),
     checkOfficialLink: (url) => ipcRenderer.invoke("system:checkOfficialLink", url)

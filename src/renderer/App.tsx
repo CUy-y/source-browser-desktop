@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { applyFilters, paginate, productIdentity } from "../shared/products";
+import { applyFilters, buildFieldCalibration, paginate, productIdentity } from "../shared/products";
 import { evaluateRelationHealth } from "../shared/relation-health";
 import { normalizeRequestedPagesOnBlur, parseRequestedPages } from "../shared/search-input";
-import type { AuthStatus, ConnectGoodsRequest, FavoriteRecord, FieldCalibration, GoodsCategoryOption, LocalFilters, LocalLibraryState, ProductRecord, RelationPriceMode, SearchPreset, SearchJobProgress, SearchRequest } from "../shared/types";
+import type { AuthStatus, ConnectGoodsRequest, FavoriteRecord, FieldCalibration, GoodsCategoryOption, LocalFilters, LocalLibraryState, ProductRecord, RelationPriceMode, SearchPreset, SearchJobProgress, SearchRequest, SearchScope } from "../shared/types";
 import { PriceHistoryChart } from "./PriceHistoryChart";
 
-type FormState = LocalFilters & Omit<SearchRequest, "pages"> & {
+type FormState = LocalFilters & Omit<SearchRequest, "pages" | "searchScope"> & {
+  searchScope: SearchScope;
   pagesInput: string;
   localPageSize: 10 | 20 | 50 | 100;
 };
@@ -13,10 +14,11 @@ type FormState = LocalFilters & Omit<SearchRequest, "pages"> & {
 type ConnectFormState = Omit<ConnectGoodsRequest, "goodsId" | "price">;
 
 const SETTINGS_KEY = "ldxp-source-browser-settings-v1";
-const emptyLibrary: LocalLibraryState = { favorites: [], presets: [], monitorEvents: [], priceHistory: {} };
+const emptyLibrary: LocalLibraryState = { favorites: [], presets: [], monitorEvents: [], priceHistory: {}, publicShops: [] };
 
 const defaults: FormState = {
   keywords: "",
+  searchScope: "source",
   goodsType: "",
   pagesInput: "50",
   remotePageSize: 50,
@@ -55,6 +57,16 @@ const money = (value: number | null): string => value === null
 
 const integer = (value: number | null): string => value === null ? "—" : String(value);
 const dateTime = (value: number): string => new Intl.DateTimeFormat("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(value);
+
+const mergeSearchResults = (sourceProducts: ProductRecord[], publicProducts: ProductRecord[]): ProductRecord[] => {
+  const seen = new Set<string>();
+  return [...sourceProducts, ...publicProducts].flatMap((product, sourceIndex) => {
+    const identity = productIdentity(product);
+    if (seen.has(identity)) return [];
+    seen.add(identity);
+    return [{ ...product, sourceIndex }];
+  });
+};
 
 function toNumberOrNull(value: string): number | null {
   if (value.trim() === "") return null;
@@ -124,6 +136,9 @@ export function App() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [monitorOpen, setMonitorOpen] = useState(false);
+  const [publicShopsOpen, setPublicShopsOpen] = useState(false);
+  const [publicSourceInput, setPublicSourceInput] = useState("");
+  const [publicBusy, setPublicBusy] = useState("");
   const [healthProduct, setHealthProduct] = useState<ProductRecord | null>(null);
   const [healthLinkCheck, setHealthLinkCheck] = useState<{ loading: boolean; valid: boolean | null; status: number | null }>({ loading: false, valid: null, status: null });
   const [connectProduct, setConnectProduct] = useState<ProductRecord | null>(null);
@@ -133,6 +148,8 @@ export function App() {
   const [connectSubmitting, setConnectSubmitting] = useState(false);
   const [relationActionId, setRelationActionId] = useState("");
   const pollTimer = useRef<number | null>(null);
+  const pendingPublicProducts = useRef<ProductRecord[]>([]);
+  const pendingSearchScope = useRef<SearchScope>("source");
 
   useEffect(() => {
     void window.sourceBrowser.auth.getStatus().then(setAuth).catch((error) => setMessage(errorMessage(error)));
@@ -198,21 +215,25 @@ export function App() {
       }
       setCurrentJobId("");
       if (next.status === "done") {
-        setProducts(next.result || []);
-        setCalibration(next.calibration || null);
+        const sourceProducts = next.result || [];
+        const combined = pendingSearchScope.current === "all"
+          ? mergeSearchResults(sourceProducts, pendingPublicProducts.current)
+          : sourceProducts;
+        setProducts(combined);
+        setCalibration(next.calibration || buildFieldCalibration(sourceProducts));
         setLibrary(await window.sourceBrowser.local.getState());
         setPage(1);
         const refreshNote = next.monitor?.favoriteRefreshTotal
           ? `；收藏刷新 ${next.monitor.favoriteRefreshLoaded}/${next.monitor.favoriteRefreshTotal}${next.monitor.favoriteRefreshFailed ? `，失败 ${next.monitor.favoriteRefreshFailed}` : ""}`
           : "";
         if (!next.coverageComplete) {
-          setMessage(`本次成功拉取 ${next.loadedPages} 页，但平台共有 ${next.remoteTotalPages} 页；为避免误报，已跳过价格变化和下架监控${refreshNote}`);
+          setMessage(`本次成功拉取 ${next.loadedPages} 页，但平台共有 ${next.remoteTotalPages} 页；为避免误报，已跳过价格变化和下架监控${refreshNote}${pendingSearchScope.current === "all" ? `；合并公开商品 ${pendingPublicProducts.current.length} 条` : ""}`);
         } else if (next.monitor?.baselineCreated) {
-          setMessage(`完整拉取成功，已建立本查询方案的监控基线${refreshNote}`);
+          setMessage(`完整拉取成功，已建立本查询方案的监控基线${refreshNote}${pendingSearchScope.current === "all" ? `；合并公开商品 ${pendingPublicProducts.current.length} 条` : ""}`);
         } else if (next.monitor?.changedProducts) {
-          setMessage(`完整拉取成功，发现 ${next.monitor.changedProducts} 个商品发生变化${refreshNote}`);
+          setMessage(`完整拉取成功，发现 ${next.monitor.changedProducts} 个商品发生变化${refreshNote}${pendingSearchScope.current === "all" ? `；合并公开商品 ${pendingPublicProducts.current.length} 条` : ""}`);
         } else {
-          setMessage(`完整拉取成功，未发现商品价格、库存或状态变化${refreshNote}`);
+          setMessage(`完整拉取成功，未发现商品价格、库存或状态变化${refreshNote}${pendingSearchScope.current === "all" ? `；合并公开商品 ${pendingPublicProducts.current.length} 条` : ""}`);
         }
       } else {
         setMessage(next.error || "查询未完成");
@@ -238,11 +259,13 @@ export function App() {
   const startSearch = async () => {
     const keywords = form.keywords.trim();
     if (!keywords) return setMessage("请输入关键词");
-    let requestedPages: number;
-    try {
-      requestedPages = parseRequestedPages(form.pagesInput);
-    } catch (error) {
-      return setMessage(error instanceof Error ? error.message : "拉取页数不正确");
+    let requestedPages = 1;
+    if (form.searchScope !== "public") {
+      try {
+        requestedPages = parseRequestedPages(form.pagesInput);
+      } catch (error) {
+        return setMessage(error instanceof Error ? error.message : "拉取页数不正确");
+      }
     }
     if (form.minSalePrice !== null && form.maxSalePrice !== null && form.minSalePrice > form.maxSalePrice) {
       return setMessage("售价下限不能高于售价上限");
@@ -251,12 +274,27 @@ export function App() {
     setActiveFilters(form);
     setPage(1);
     try {
+      const publicProducts = form.searchScope === "source"
+        ? []
+        : await window.sourceBrowser.publicCatalog.search({ keywords, goodsType: form.goodsType });
+      pendingPublicProducts.current = publicProducts;
+      pendingSearchScope.current = form.searchScope;
+      if (form.searchScope === "public") {
+        setProducts(publicProducts);
+        setCalibration(null);
+        setProgress(null);
+        setMessage(publicProducts.length
+          ? `已从 ${library.publicShops.length} 个本地公开店铺中找到 ${publicProducts.length} 个商品`
+          : library.publicShops.length ? "公开店铺库中没有匹配商品，可刷新店铺后重试" : "公开店铺库为空，请先添加商品或店铺链接");
+        return;
+      }
       const started = await window.sourceBrowser.catalog.startSearch({
         keywords,
         goodsType: form.goodsType,
         pages: requestedPages,
         remotePageSize: form.remotePageSize,
-        speedMode: form.speedMode
+        speedMode: form.speedMode,
+        searchScope: "source"
       });
       setCurrentJobId(started.jobId);
       setProgress({
@@ -310,6 +348,7 @@ export function App() {
     const next = await window.sourceBrowser.catalog.cancel(currentJobId);
     setProgress(next);
     setCurrentJobId("");
+    pendingPublicProducts.current = [];
     setMessage(next.error || "查询已取消");
   };
 
@@ -369,16 +408,16 @@ export function App() {
   const savePreset = async () => {
     const name = presetName.trim();
     if (!name) return setMessage("请先填写查询方案名称");
-    let pages: number;
+    let pages = 1;
     try {
-      pages = parseRequestedPages(form.pagesInput);
+      if (form.searchScope !== "public") pages = parseRequestedPages(form.pagesInput);
     } catch (error) {
       return setMessage(errorMessage(error));
     }
     try {
       setLibrary(await window.sourceBrowser.local.savePreset({
         name,
-        search: { keywords: form.keywords.trim(), goodsType: form.goodsType, pages, remotePageSize: form.remotePageSize, speedMode: form.speedMode },
+        search: { keywords: form.keywords.trim(), goodsType: form.goodsType, pages, remotePageSize: form.remotePageSize, speedMode: form.speedMode, searchScope: form.searchScope },
         filters: {
           minSalePrice: form.minSalePrice,
           maxSalePrice: form.maxSalePrice,
@@ -429,6 +468,85 @@ export function App() {
     }
   };
 
+  const addPublicSource = async () => {
+    const url = publicSourceInput.trim();
+    if (!url || publicBusy) return setMessage("请粘贴链动小铺商品或店铺链接");
+    setPublicBusy("add");
+    try {
+      const result = await window.sourceBrowser.publicCatalog.addSource(url);
+      setLibrary(result.state);
+      setPublicSourceInput("");
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setPublicBusy("");
+    }
+  };
+
+  const refreshPublicShop = async (token: string) => {
+    if (publicBusy) return;
+    setPublicBusy(token);
+    try {
+      const result = await window.sourceBrowser.publicCatalog.refreshShop(token);
+      setLibrary(result.state);
+      setMessage(result.message);
+    } catch (error) {
+      setLibrary(await window.sourceBrowser.local.getState());
+      setMessage(errorMessage(error));
+    } finally {
+      setPublicBusy("");
+    }
+  };
+
+  const refreshAllPublicShops = async () => {
+    if (publicBusy || !library.publicShops.length) return;
+    setPublicBusy("all");
+    try {
+      const result = await window.sourceBrowser.publicCatalog.refreshAll();
+      setLibrary(result.state);
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setPublicBusy("");
+    }
+  };
+
+  const removePublicShop = async (token: string, name: string) => {
+    if (publicBusy || !window.confirm(`确定从本机公开店铺库移除“${name}”？不会修改链动小铺数据。`)) return;
+    const result = await window.sourceBrowser.publicCatalog.removeShop(token);
+    setLibrary(result.state);
+    setMessage(result.message);
+  };
+
+  const importPublicShops = async () => {
+    if (publicBusy) return;
+    setPublicBusy("import");
+    try {
+      const result = await window.sourceBrowser.publicCatalog.importShops();
+      setLibrary(result.state);
+      setMessage(result.message);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setPublicBusy("");
+    }
+  };
+
+  const exportPublicShops = async () => {
+    if (publicBusy || !library.publicShops.length) return;
+    setPublicBusy("export");
+    try {
+      const result = await window.sourceBrowser.publicCatalog.exportShops();
+      if (result.exported) setMessage(`公开店铺列表已导出${result.filePath ? `：${result.filePath}` : ""}`);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setPublicBusy("");
+    }
+  };
+
   const openRelationHealth = async (product: ProductRecord) => {
     setHealthProduct(product);
     const link = product.relationDetails.link;
@@ -443,6 +561,7 @@ export function App() {
   };
 
   const openConnectGoods = async (product: ProductRecord) => {
+    if (product.dataSource === "public-shop") return setMessage("公开零售商品不属于货源广场，无法直接关联");
     if (!product.goodsType || product.id.startsWith("row-")) return setMessage("该商品缺少可用的类型或商品 ID，无法关联");
     const cost = product.costPrice ?? 0;
     const hasLimit = product.agentPriceLimit !== null && product.agentPriceLimit > 0 && cost > 0;
@@ -524,6 +643,8 @@ export function App() {
     ? Math.min(calibration.salePrice, calibration.costPrice, calibration.stock, calibration.merchant, calibration.category) < 70
     : false;
   const healthReport = healthProduct ? evaluateRelationHealth(healthProduct) : null;
+  const sourceResultCount = products.filter((product) => product.dataSource !== "public-shop").length;
+  const publicResultCount = products.length - sourceResultCount;
 
   return (
     <main className="app-shell">
@@ -544,6 +665,16 @@ export function App() {
 
       <section className="filter-card">
         <div className="filter-grid">
+          <Field label="查询范围">
+            <select value={form.searchScope} onChange={(event) => {
+              const searchScope = event.target.value as SearchScope;
+              setForm((current) => ({ ...current, searchScope, relationState: searchScope === "public" ? "all" : current.relationState }));
+            }}>
+              <option value="source">货源广场</option>
+              <option value="public">公开店铺</option>
+              <option value="all">全部数据</option>
+            </select>
+          </Field>
           <Field label="关键词" className="keyword-field">
             <input value={form.keywords} maxLength={100} placeholder="例如：k12" onChange={(event) => update("keywords", event.target.value)} onKeyDown={(event) => event.key === "Enter" && void startSearch()} />
           </Field>
@@ -559,6 +690,7 @@ export function App() {
               type="text"
               inputMode="numeric"
               value={form.pagesInput}
+              disabled={form.searchScope === "public"}
               placeholder="1–100"
               onChange={(event) => {
                 const value = event.target.value;
@@ -586,7 +718,7 @@ export function App() {
             </select>
           </Field>
           <Field label="关联状态">
-            <select value={form.relationState} onChange={(event) => update("relationState", event.target.value as FormState["relationState"])}>
+            <select disabled={form.searchScope === "public"} value={form.relationState} onChange={(event) => update("relationState", event.target.value as FormState["relationState"])}>
               <option value="all">全部</option><option value="connected">已关联</option><option value="unconnected">未关联</option>
             </select>
           </Field>
@@ -610,12 +742,12 @@ export function App() {
             <input value={form.blockedKeywords} placeholder="free, 镜像, 中转（逗号或换行分隔）" onChange={(event) => update("blockedKeywords", event.target.value)} />
           </Field>
           <Field label="远端每页">
-            <select value={form.remotePageSize} onChange={(event) => update("remotePageSize", Number(event.target.value) as FormState["remotePageSize"])}>
+            <select disabled={form.searchScope === "public"} value={form.remotePageSize} onChange={(event) => update("remotePageSize", Number(event.target.value) as FormState["remotePageSize"])}>
               <option value={20}>20 条</option><option value={50}>50 条</option><option value={100}>100 条</option>
             </select>
           </Field>
           <Field label="拉取速度">
-            <select value={form.speedMode} onChange={(event) => update("speedMode", event.target.value as FormState["speedMode"])}>
+            <select disabled={form.searchScope === "public"} value={form.speedMode} onChange={(event) => update("speedMode", event.target.value as FormState["speedMode"])}>
               <option value="fast">快速（双页并发）</option><option value="standard">标准</option><option value="stable">稳定</option>
             </select>
           </Field>
@@ -624,11 +756,12 @@ export function App() {
 
       <section className="actions-row">
         <div className="action-buttons">
-          <button className="primary" type="button" disabled={Boolean(currentJobId)} onClick={() => void startSearch()}>{currentJobId ? "拉取中…" : "开始拉取"}</button>
+          <button className="primary" type="button" disabled={Boolean(currentJobId)} onClick={() => void startSearch()}>{currentJobId ? "拉取中…" : "开始查询"}</button>
           <button className="secondary" type="button" disabled={Boolean(currentJobId)} onClick={applyCurrentFilters}>筛选当前数据</button>
           <button className="ghost" type="button" disabled={Boolean(currentJobId)} onClick={resetFilters}>重置</button>
           <button className="utility-button" type="button" onClick={() => setFavoritesOpen(true)}>收藏栏 {library.favorites.length}</button>
           <button className="utility-button" type="button" onClick={() => setPresetsOpen(true)}>查询方案 {library.presets.length}</button>
+          <button className="utility-button" type="button" onClick={() => setPublicShopsOpen(true)}>公开店铺 {library.publicShops.length}</button>
           <button className="utility-button" type="button" disabled={!filteredProducts.length} onClick={() => void exportCurrent()}>导出当前结果</button>
           <button className="utility-button" type="button" onClick={() => setMonitorOpen(true)}>变化记录 {library.monitorEvents.length}</button>
           {currentJobId && <button className="danger" type="button" onClick={() => void cancelSearch()}>停止查询</button>}
@@ -653,7 +786,7 @@ export function App() {
 
       <section className="summary-row">
         <div className="summary-group">
-          <span className="summary-pill">已拉取 {products.length} 条，筛选后 {filteredProducts.length} 条</span>
+          <span className="summary-pill">已查询 {products.length} 条，筛选后 {filteredProducts.length} 条{publicResultCount > 0 ? ` · 货源 ${sourceResultCount} / 公开 ${publicResultCount}` : ""}</span>
           {calibration && calibration.total > 0 && (
             <span className={`calibration-pill ${calibrationWarning ? "calibration-warning" : ""}`} title="基于本次真实返回结果自动计算，不保存原始响应">
               字段覆盖：售价 {calibration.salePrice}% · 成本 {calibration.costPrice}% · 库存 {calibration.stock}% · 店铺 {calibration.merchant}% · 分类 {calibration.category}%
@@ -689,22 +822,23 @@ export function App() {
                       >{product.name}</button>
                     ) : <strong className="product-name" title={product.name}>{product.name}</strong>}
                     <span className="product-id">ID: {product.id}</span>
+                    <span className={`source-label ${product.dataSource === "public-shop" ? "source-public" : "source-square"}`}>{product.dataSource === "public-shop" ? "公开零售" : "货源广场"}</span>
                     {product.change?.messages.map((change) => <span className="change-label" key={change}>{change}</span>)}
                   </td>
                   <td>{product.merchantName || "—"}</td><td>{product.categoryName || "—"}</td>
                   <td className="sale-price">{money(product.salePrice)}</td><td className="cost-price">{money(product.costPrice)}</td>
                   <td className={product.stock && product.stock > 0 ? "stock-ok" : ""}>{integer(product.stock)}</td><td>{integer(product.sales)}</td>
                   <td><span className={`badge status-${product.status}`}>{product.statusLabel}</span></td>
-                  <td><span className={`badge relation-${product.relation}`}>{product.relation === "connected" ? "已关联" : product.relation === "unconnected" ? "未关联" : "未知"}</span></td>
+                  <td><span className={`badge ${product.dataSource === "public-shop" ? "relation-unavailable" : `relation-${product.relation}`}`}>{product.dataSource === "public-shop" ? "不可关联" : product.relation === "connected" ? "已关联" : product.relation === "unconnected" ? "未关联" : "未知"}</span></td>
                   <td>
                     <div className="row-actions">
                       <button className={`favorite-button ${favoriteMap.has(productIdentity(product)) ? "is-favorite" : ""}`} type="button" onClick={() => void toggleFavorite(product)}>{favoriteMap.has(productIdentity(product)) ? "★ 已收藏" : "☆ 收藏"}</button>
-                      {product.relation === "unconnected" && !product.id.startsWith("row-") ? (
+                      {product.dataSource !== "public-shop" && product.relation === "unconnected" && !product.id.startsWith("row-") ? (
                         <button className="relation-action relation-connect-action" type="button" disabled={Boolean(relationActionId)} onClick={() => void openConnectGoods(product)}>立即关联</button>
-                      ) : product.relation === "connected" && !product.id.startsWith("row-") ? (
+                      ) : product.dataSource !== "public-shop" && product.relation === "connected" && !product.id.startsWith("row-") ? (
                         <button className="relation-action relation-disconnect-action" type="button" disabled={Boolean(relationActionId)} onClick={() => void disconnectGoods(product)}>{relationActionId === product.id ? "取消中…" : "取消关联"}</button>
                       ) : null}
-                      {product.relation === "connected" && <button className="health-button" type="button" onClick={() => void openRelationHealth(product)}>关联体检</button>}
+                      {product.dataSource !== "public-shop" && product.relation === "connected" && <button className="health-button" type="button" onClick={() => void openRelationHealth(product)}>关联体检</button>}
                       {product.detailUrl ? <button className="detail-button" type="button" onClick={() => void window.sourceBrowser.system.openExternal(product.detailUrl)}>详情</button> : "—"}
                     </div>
                   </td>
@@ -756,6 +890,43 @@ export function App() {
                   <button className="primary" type="button" disabled={connectSubmitting || !connectForm.name.trim()} onClick={() => void submitConnectGoods()}>{connectSubmitting ? "正在关联…" : "确认关联"}</button>
                 </div>
               </>}
+            </div>
+          </section>
+        </div>
+      )}
+      {publicShopsOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="modal-card library-modal public-shop-modal" role="dialog" aria-modal="true" aria-labelledby="public-shops-title">
+            <header className="modal-header">
+              <div><p>PUBLIC SHOPS</p><h2 id="public-shops-title">公开店铺库 · {library.publicShops.length}</h2></div>
+              <button type="button" aria-label="关闭" disabled={Boolean(publicBusy)} onClick={() => setPublicShopsOpen(false)}>×</button>
+            </header>
+            <div className="modal-body">
+              <p className="monitor-rule">粘贴链动小铺商品或店铺链接。商品链接会先反查所属店铺，再把该店公开商品保存到本机。公开零售商品不包含货源成本和关联能力。</p>
+              <div className="public-source-create">
+                <input
+                  value={publicSourceInput}
+                  placeholder="https://www.ldxp.cn/item/... 或 https://pay.ldxp.cn/shop/..."
+                  onChange={(event) => setPublicSourceInput(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && void addPublicSource()}
+                />
+                <button className="primary" type="button" disabled={Boolean(publicBusy) || !publicSourceInput.trim()} onClick={() => void addPublicSource()}>{publicBusy === "add" ? "正在收录…" : "收录整店"}</button>
+              </div>
+              <div className="public-shop-toolbar">
+                <button className="secondary" type="button" disabled={Boolean(publicBusy) || !library.publicShops.length} onClick={() => void refreshAllPublicShops()}>{publicBusy === "all" ? "正在刷新…" : "刷新全部"}</button>
+                <button className="ghost" type="button" disabled={Boolean(publicBusy)} onClick={() => void importPublicShops()}>{publicBusy === "import" ? "正在导入…" : "导入店铺列表"}</button>
+                <button className="ghost" type="button" disabled={Boolean(publicBusy) || !library.publicShops.length} onClick={() => void exportPublicShops()}>导出店铺列表</button>
+              </div>
+              <div className="public-shop-list">
+                {library.publicShops.length === 0 ? <div className="chart-empty">尚未收录公开店铺。可以先粘贴一个商品链接。</div> : library.publicShops.map((shop) => <article className="public-shop-card" key={shop.token}>
+                  <div><strong>{shop.name}</strong><span>{shop.url}</span><small>{shop.goodsCount} 个公开商品 · 更新于 {dateTime(shop.updatedAt)}</small>{shop.lastError && <small className="shop-error">上次刷新：{shop.lastError}</small>}</div>
+                  <div className="favorite-actions">
+                    <button type="button" disabled={Boolean(publicBusy)} onClick={() => void refreshPublicShop(shop.token)}>{publicBusy === shop.token ? "刷新中…" : "刷新"}</button>
+                    <button type="button" onClick={() => void window.sourceBrowser.system.openExternal(shop.url)}>打开店铺</button>
+                    <button className="danger-text" type="button" disabled={Boolean(publicBusy)} onClick={() => void removePublicShop(shop.token, shop.name)}>移除</button>
+                  </div>
+                </article>)}
+              </div>
             </div>
           </section>
         </div>
