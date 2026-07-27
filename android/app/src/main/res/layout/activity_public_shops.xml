@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/blue_050"
+    android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/blue_900" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="12dp">
+        <Button android:id="@+id/public_back" android:layout_width="wrap_content" android:layout_height="40dp" android:backgroundTint="@color/blue_700" android:text="返回" android:textAllCaps="false" android:textColor="#FFFFFF" />
+        <TextView android:id="@+id/public_title" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:layout_weight="1" android:text="公开店铺库" android:textColor="#FFFFFF" android:textSize="19sp" android:textStyle="bold" />
+    </LinearLayout>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="10dp" android:text="粘贴链动小铺商品或店铺链接；商品链接会反查所属店铺并收录整店。" android:textColor="@color/text_secondary" android:textSize="12sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/surface" android:orientation="horizontal" android:padding="8dp">
+        <EditText android:id="@+id/public_source_input" android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1" android:hint="https://www.ldxp.cn/item/..." android:inputType="textUri" android:singleLine="true" />
+        <Button android:id="@+id/public_add" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginStart="8dp" android:background="@drawable/button_primary" android:text="收录" android:textAllCaps="false" android:textColor="#FFFFFF" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="8dp">
+        <Button android:id="@+id/public_refresh_all" android:layout_width="wrap_content" android:layout_height="42dp" android:text="刷新全部" android:textAllCaps="false" />
+        <ProgressBar android:id="@+id/public_progress" android:layout_width="32dp" android:layout_height="32dp" android:layout_marginStart="10dp" android:visibility="gone" />
+        <TextView android:id="@+id/public_message" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:textColor="@color/text_secondary" android:textSize="12sp" />
+    </LinearLayout>
+    <ListView android:id="@+id/public_shop_list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:clipToPadding="false" android:divider="@android:color/transparent" android:dividerHeight="8dp" android:padding="8dp" />
+</LinearLayout>

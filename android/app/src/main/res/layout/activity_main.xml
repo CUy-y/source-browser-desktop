@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/blue_050"
+    android:orientation="vertical">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/blue_900" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="14dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="链动货源查询" android:textColor="#FFFFFF" android:textSize="19sp" android:textStyle="bold" />
+        <TextView android:id="@+id/account_name" android:layout_width="wrap_content" android:layout_height="wrap_content" android:maxWidth="120dp" android:ellipsize="end" android:singleLine="true" android:textColor="#DDEEFF" android:textSize="12sp" />
+        <Button android:id="@+id/logout_button" android:layout_width="wrap_content" android:layout_height="40dp" android:layout_marginStart="6dp" android:backgroundTint="@color/blue_700" android:text="退出" android:textAllCaps="false" android:textColor="#FFFFFF" />
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/surface" android:orientation="vertical" android:padding="10dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <Spinner android:id="@+id/scope_spinner" android:layout_width="120dp" android:layout_height="48dp" />
+            <EditText android:id="@+id/keyword_input" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="8dp" android:layout_weight="1" android:hint="输入关键词" android:imeOptions="actionSearch" android:inputType="text" android:maxLength="100" android:singleLine="true" />
+            <Spinner android:id="@+id/type_spinner" android:layout_width="92dp" android:layout_height="48dp" android:layout_marginStart="6dp" />
+        </LinearLayout>
+        <LinearLayout android:id="@+id/remote_options" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="页数" android:textColor="@color/text_secondary" />
+            <EditText android:id="@+id/pages_input" android:layout_width="54dp" android:layout_height="44dp" android:inputType="number" android:maxLength="3" android:singleLine="true" android:text="50" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:text="远端" android:textColor="@color/text_secondary" />
+            <Spinner android:id="@+id/remote_size_spinner" android:layout_width="78dp" android:layout_height="44dp" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="速度" android:textColor="@color/text_secondary" />
+            <Spinner android:id="@+id/speed_spinner" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal">
+            <Button android:id="@+id/search_button" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1" android:background="@drawable/button_primary" android:text="开始查询" android:textAllCaps="false" android:textColor="#FFFFFF" android:textStyle="bold" />
+            <Button android:id="@+id/filter_button" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginStart="7dp" android:text="筛选" android:textAllCaps="false" />
+            <Button android:id="@+id/public_shops_button" android:layout_width="wrap_content" android:layout_height="44dp" android:layout_marginStart="7dp" android:text="公开店铺" android:textAllCaps="false" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView android:id="@+id/message_text" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/blue_100" android:padding="8dp" android:textColor="@color/text_primary" android:textSize="12sp" android:visibility="gone" />
+    <ProgressBar android:id="@+id/search_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="4dp" android:max="100" android:visibility="gone" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="42dp" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="10dp">
+        <TextView android:id="@+id/summary_text" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="尚未查询" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="每页" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        <Spinner android:id="@+id/local_size_spinner" android:layout_width="72dp" android:layout_height="40dp" />
+    </LinearLayout>
+    <ListView android:id="@+id/product_list" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:clipToPadding="false" android:divider="@android:color/transparent" android:dividerHeight="8dp" android:paddingHorizontal="8dp" android:paddingBottom="8dp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:background="@color/surface" android:gravity="center" android:orientation="horizontal">
+        <Button android:id="@+id/previous_page" android:layout_width="wrap_content" android:layout_height="40dp" android:text="上一页" android:textAllCaps="false" />
+        <TextView android:id="@+id/page_text" android:layout_width="100dp" android:layout_height="wrap_content" android:gravity="center" android:text="1 / 1" android:textColor="@color/text_primary" />
+        <Button android:id="@+id/next_page" android:layout_width="wrap_content" android:layout_height="40dp" android:text="下一页" android:textAllCaps="false" />
+    </LinearLayout>
+</LinearLayout>

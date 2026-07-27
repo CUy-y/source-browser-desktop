@@ -16,3 +16,8 @@ screenshots/local/
 .DS_Store
 
 release-private/
+
+# Android local/build artifacts
+android/.gradle/
+android/local.properties
+android/**/build/

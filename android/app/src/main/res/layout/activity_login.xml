@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/surface"
+    android:orientation="vertical">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp" android:background="@color/blue_900" android:gravity="center_vertical" android:orientation="horizontal" android:paddingHorizontal="16dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="@string/login_title" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold" />
+        <Button android:id="@+id/login_reload" android:layout_width="wrap_content" android:layout_height="40dp" android:backgroundTint="@color/blue_700" android:text="刷新" android:textAllCaps="false" android:textColor="#FFFFFF" />
+    </LinearLayout>
+    <ProgressBar android:id="@+id/login_progress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:indeterminate="true" />
+    <TextView android:id="@+id/login_message" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@color/blue_050" android:padding="8dp" android:text="请直接在链动小铺官方页面完成登录" android:textColor="@color/text_secondary" android:textSize="12sp" />
+    <WebView android:id="@+id/login_webview" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+</LinearLayout>

@@ -1,0 +1,68 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "cn.ldxp.sourcebrowser.android"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "cn.ldxp.sourcebrowser.android"
+        minSdk 29
+        targetSdk 36
+        versionCode 10900
+        versionName "1.9.0"
+
+        testInstrumentationRunner "android.test.InstrumentationTestRunner"
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            signingConfig signingConfigs.debug
+            debuggable false
+            optimization {
+                enable = true
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+dependencies {
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20250517"
+}
+
+tasks.register("verifyMobileScope") {
+    doLast {
+        def forbidden = [
+            "/merchantApi/MyParent/connectGoods",
+            "/merchantApi/MyParent/disconnectGoods",
+            "priceHistory",
+            "monitorEvents",
+            "READ_CONTACTS",
+            "READ_EXTERNAL_STORAGE",
+            "WRITE_EXTERNAL_STORAGE",
+            "ACCESS_FINE_LOCATION"
+        ]
+        def files = fileTree("src/main") { include "**/*.java", "**/*.xml" }
+        forbidden.each { marker ->
+            def match = files.find { it.getText("UTF-8").contains(marker) }
+            if (match != null) throw new GradleException("Android 查询版包含禁止内容 ${marker}: ${match}")
+        }
+    }
+}
+
+tasks.named("check").configure { dependsOn("verifyMobileScope") }

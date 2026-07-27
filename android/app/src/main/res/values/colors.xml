@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="blue_900">#0B3A73</color>
+    <color name="blue_700">#1261B8</color>
+    <color name="blue_600">#1874D1</color>
+    <color name="blue_100">#DCEEFF</color>
+    <color name="blue_050">#F2F8FF</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="text_primary">#132A44</color>
+    <color name="text_secondary">#58718F</color>
+    <color name="danger">#B3261E</color>
+</resources>
